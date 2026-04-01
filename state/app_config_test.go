@@ -37,10 +37,12 @@ func (fs MockFileSystem) Stat(path string) (fs.FileInfo, error) {
 }
 
 func TestWriteAppConfig(t *testing.T) {
+	t.Cleanup(deleteTestDir)
 	tests := []struct {
 		cfg AppConfig
 	}{
-		{cfg: AppConfig{VaultPath: "/User/cornelius/Document/"}},
+		{cfg: AppConfig{Vaults: []Path{"/User/cornelius/Document/1"}}},
+		{cfg: AppConfig{Vaults: []Path{"/User/cornelius/Document/2", "/User/cornelius/3"}}},
 	}
 
 	fs := NewAppFileSystem()
@@ -50,39 +52,26 @@ func TestWriteAppConfig(t *testing.T) {
 			t.Fatalf("write app config failed: %v", err)
 		}
 
-		basePath, err := os.UserConfigDir()
+		appCfg, err := LoadAppConfig(fs)
 		if err != nil {
-			t.Fatal("getting config path failed")
+			t.Fatalf("failed reading config: %v", err)
 		}
 
-		filePath := filepath.Join(basePath, "bible-app", "config.json")
-		data, err := fs.ReadFile(filePath)
-		if err != nil {
-			t.Fatalf("read file failed")
-		}
-		var cfg AppConfig
-		err = json.Unmarshal(data, &cfg)
-		if err != nil {
-			t.Fatal("failed to unmarshal json")
-		}
-		fmt.Println(cfg.VaultPath)
-		if cfg.VaultPath != tt.cfg.VaultPath {
-			t.Error("Vault path are wrong")
+		if len(tt.cfg.Vaults) != len(appCfg.Vaults) {
+			t.Fatalf("config doesn't have same number of vault paths\n exp: %d, got:%d", len(tt.cfg.Vaults), len(appCfg.Vaults))
 		}
 
-		dirPath := filepath.Join(basePath, "bible-app")
-		err = os.RemoveAll(dirPath)
-		if err != nil {
-			fmt.Println("Error deleting directory tree: ", err)
-			return
-
+		for i, path := range tt.cfg.Vaults {
+			if appCfg.Vaults[i] != path {
+				t.Error("Vault path are wrong")
+			}
 		}
 	}
 }
 
 func TestWriteAppConfig_MockFS(t *testing.T) {
 	mockFS := &MockFileSystem{Files: map[string][]byte{}}
-	cfg := AppConfig{VaultPath: "/User/cornelius/vault/"}
+	cfg := AppConfig{Vaults: []Path{"/User/cornelius/vault/"}}
 
 	err := WriteAppConfig(cfg, mockFS)
 	if err != nil {
@@ -104,8 +93,8 @@ func TestWriteAppConfig_MockFS(t *testing.T) {
 		t.Fatalf("written data is not valid JSON: %v", err)
 	}
 
-	if result.VaultPath != cfg.VaultPath {
-		t.Errorf("got VaultPath %q, want %q", result.VaultPath, cfg.VaultPath)
+	if result.Vaults[0] != cfg.Vaults[0] {
+		t.Errorf("got VaultPath %q, want %q", result.Vaults[0], cfg.Vaults[0])
 	}
 
 }
@@ -118,7 +107,7 @@ func TestLoadAppConfig(t *testing.T) {
 		t.Errorf("failed error handling: %v", err)
 	}
 
-	cfg := AppConfig{VaultPath: "/User/cornelius/Documents/"}
+	cfg := AppConfig{Vaults: []Path{"/User/cornelius/Documents/"}}
 	err = WriteAppConfig(cfg, fs)
 	defer deleteTestDir()
 	if err != nil {
@@ -130,8 +119,8 @@ func TestLoadAppConfig(t *testing.T) {
 		t.Fatalf("failed to read app config: %v", err)
 	}
 
-	if appCfg.VaultPath != cfg.VaultPath {
-		t.Errorf("got vault path: %s, expected: %s", appCfg.VaultPath, cfg.VaultPath)
+	if appCfg.Vaults[0] != cfg.Vaults[0] {
+		t.Errorf("got vault path: %s, expected: %s", appCfg.Vaults[0], cfg.Vaults[0])
 	}
 
 }

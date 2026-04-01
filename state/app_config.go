@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 var (
@@ -14,8 +15,25 @@ var (
 	ErrJSONUnmarshal  = errors.New("json unmarshall failed")
 )
 
+type Path string
+
 type AppConfig struct {
-	VaultPath string `json:"vaultpath"`
+	Vaults      []Path `json:"vault_path"`
+	ActiveVault Path   `json:"active_vault"`
+}
+
+func (cfg *AppConfig) AddVault(path Path) {
+	cfg.Vaults = append(cfg.Vaults, path)
+}
+
+func (cfg *AppConfig) DeleteVault(path Path) {
+	cfg.Vaults = slices.DeleteFunc(cfg.Vaults, func(vp Path) bool {
+		return vp == path
+	})
+}
+
+func (cfg *AppConfig) SetActiveVault(path Path) {
+	cfg.ActiveVault = path
 }
 
 // LoadAppConfig reads the app config from the OS config directory.
@@ -40,6 +58,7 @@ func LoadAppConfig(fs FileSystem) (*AppConfig, error) {
 			return nil, ErrConfigNotFound
 		}
 
+		return nil, err
 	}
 
 	var appConfig AppConfig
